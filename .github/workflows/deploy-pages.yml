@@ -1,0 +1,48 @@
+name: Deploy dashboard to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "01_Source_Code/capr-webapp/frontend/**"
+      - ".github/workflows/deploy-pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: 01_Source_Code/capr-webapp/frontend/capr-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: 01_Source_Code/capr-webapp/frontend/capr-dashboard/package-lock.json
+      - run: npm ci
+      - run: npx ng build --configuration demo --base-href "/${{ github.event.repository.name }}/"
+      - run: cp dist/capr-dashboard/browser/index.html dist/capr-dashboard/browser/404.html
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: 01_Source_Code/capr-webapp/frontend/capr-dashboard/dist/capr-dashboard/browser
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
