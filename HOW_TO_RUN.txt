@@ -1,0 +1,101 @@
+HOW TO RUN - CAPR-Boost project
+================================
+
+Setup ka idea:
+  - MODEL TRAINING  -> Google Colab (08_Colab_Demo/)
+  - WEB APP + ML SERVICE + DATABASE -> Docker (01_Source_Code/capr-webapp)
+  - Colab se trained model (capr_models.zip) download karke Docker wale ML service me daalte hain.
+
+
+A) Google Colab: model training (teacher ke saamne live)
+---------------------------------------------------------
+Files: 08_Colab_Demo/CAPR_Boost_Colab_Demo.ipynb  aur  08_Colab_Demo/capr_colab_package.zip
+
+ 1. https://colab.research.google.com -> File -> Upload notebook -> CAPR_Boost_Colab_Demo.ipynb
+ 2. Runtime -> Run all
+ 3. Cell 2 me "Choose files" -> capr_colab_package.zip select karo (~57 MB).
+    (Ya zip ko Google Drive me rakho; cell 2 me USE_DRIVE = True aur DRIVE_ZIP path set karo.)
+ 4. Part A (live demo, ~2-4 min): ek model train hota hai, accuracy/precision/recall/F1 table,
+    LightGBM aur Random Forest se comparison, confusion matrix, top features, SHAP explanation.
+    Seed 0 result: accuracy 97.15%, F1 91.70% (Darknet2020, 5% labels).
+ 5. Part B (paper numbers reproduce): PRESET choose karo:
+       headline       -> Darknet2020, 5% labels, 5 seeds  (~5-8 min)
+                         paper: CAPR-Boost accuracy 96.94%, F1 90.99%
+       ids_headline   -> IDS2018 0.5% and 5% labels (~10 min) paper: 99.64% / 99.87% accuracy
+       noise          -> 20% label noise (~5 min) paper: CAPR-Boost F1 78.70 vs LightGBM 67.14
+       all_capr_boost -> CAPR-Boost ke saare paper numbers (~1-2 hours)
+       full           -> paper ka poora experiment, sab baselines (bahut ghante)
+    Table me "colab", "paper" aur "diff" column aate hain. diff = 0.00 matlab exact same.
+    (Same code, same seeds, same split. Hamare test me headline aur noise dono me diff 0.00 aaya.)
+ 6. Part C (deployment model): dono datasets ke final models train hote hain aur
+    capr_models.zip download hoti hai. Expected: darknet2020 97.15% acc, ids2018 99.90% acc.
+
+Note: Part A ek seed hai, isliye 97.15% aata hai; paper me 5 seeds ka average 96.94% hai.
+Dono sahi hain - viva me yahi farq samjha dena.
+
+
+B) Docker: web app + ML service + SQL Server (production style)
+---------------------------------------------------------------
+Need: Docker Desktop (Windows/Mac) ya Docker Engine + compose plugin (Linux). 8 GB RAM recommended.
+
+ 1. Terminal kholo: 01_Source_Code/capr-webapp
+ 2. .env.example ko .env me copy karo     (Windows: copy .env.example .env)
+ 3. .env me ye zaroor badlo:
+       MSSQL_SA_PASSWORD   strong password (8+ chars, upper, lower, digit, symbol)
+       ADMIN_PASSWORD      admin login password
+       ML_SERVICE_API_KEY  koi bhi lambi random string (backend aur ML service ke beech)
+ 4. docker compose up -d --build        (pehli baar 5-10 min)
+ 5. docker compose ps                    (sab "healthy" / "running" hone chahiye)
+ 6. Browser: http://localhost:4200       login: admin@capr.local / ADMIN_PASSWORD
+ 7. Band karna: docker compose down      (data volume me safe rehta hai)
+    Sab kuch delete: docker compose down -v
+
+Kya production-ready hai:
+  - Har service ka healthcheck; backend tabhi start hota hai jab DB aur ML service healthy hon.
+  - Sirf frontend (port 4200) bahar khulta hai; DB, ML service, API sirf localhost par.
+  - ML service aur API non-root user se chalte hain; logs rotate hote hain (10 MB x 3).
+  - Login/forgot-password par rate limit (30/min per IP) + reset code limits.
+  - nginx: gzip, caching, security headers. API /health endpoint DB check karta hai.
+  - Database schema har start par idempotent tarike se apply hota hai (data delete nahi hota).
+
+
+C) Colab ka trained model Docker me lagana
+------------------------------------------
+ 1. Colab Part C se capr_models.zip download karo.
+ 2. Usko capr-webapp/ml-service/artifacts/ me extract karo, taaki ye files banen:
+       artifacts/darknet2020/capr_boost_model.joblib, meta.json, preprocessor.json, feature_importance.csv
+       artifacts/ids2018/...  (same)
+ 3. docker compose restart ml-service
+ 4. Web app -> Models page -> "Sync from ml-service"  (naye model ki accuracy dikhegi)
+ Folder Docker me volume ki tarah mount hai, isliye image dobara build karne ki zarurat nahi.
+
+
+D) Forgot password / e-mail
+---------------------------
+ - SMTP ke bina 6-digit code screen par dikhta hai (demo mode, SHOW_RESET_CODE_WITHOUT_SMTP=true).
+ - Real deployment: .env me SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM bharo
+   aur SHOW_RESET_CODE_WITHOUT_SMTP=false karo, phir docker compose up -d.
+
+
+E) Bina Docker (optional, development ke liye)
+----------------------------------------------
+ Need: Python 3.11+, .NET 8 SDK, Node.js 20+, SQL Server.
+ 1. sqlcmd -S localhost -U sa -P <password> -C -i database/schema.sql
+ 2. ml-service:  python -m venv .venv ; activate ; pip install -r requirements.txt ; uvicorn app.main:app --port 8000
+ 3. backend/src/CaprApi:  ConnectionStrings__CaprDb aur AdminSeed__Password env set karke  dotnet run
+ 4. frontend/capr-dashboard:  npm install ; npm start   -> http://localhost:4200
+
+
+F) Local machine par experiments (Colab ke bina)
+------------------------------------------------
+ cd 01_Source_Code/capr-anomaly
+ pip install -r requirements.txt
+ python reproduce.py --preset headline          (paper numbers check)
+ python run_experiments.py --config configs/v2_darknet.yaml     (poora experiment, ghante)
+ python make_report.py --results results/darknet2020 results/ids2018 --out results/report --artifacts artifacts
+
+
+G) Paper PDF from LaTeX
+-----------------------
+ cd 02_Research_Paper/latex
+ pdflatex main ; bibtex main ; pdflatex main ; pdflatex main      (ya folder Overleaf par upload karo)

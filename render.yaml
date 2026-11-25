@@ -1,0 +1,41 @@
+services:
+  - type: web
+    name: capr-ml-service
+    runtime: docker
+    plan: free
+    rootDir: 01_Source_Code/capr-webapp/ml-service
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ML_SERVICE_API_KEY
+        generateValue: true
+      - key: UVICORN_WORKERS
+        value: "1"
+
+  - type: web
+    name: capr-api
+    runtime: docker
+    plan: free
+    rootDir: 01_Source_Code/capr-webapp/backend/src/CaprApi
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: ASPNETCORE_URLS
+        value: http://+:8080
+      - key: ConnectionStrings__CaprDb
+        sync: false
+      - key: MlService__BaseUrl
+        sync: false
+      - key: MlService__ApiKey
+        fromService:
+          type: web
+          name: capr-ml-service
+          envVarKey: ML_SERVICE_API_KEY
+      - key: AdminSeed__Email
+        value: admin@capr.local
+      - key: AdminSeed__Password
+        sync: false
+      - key: Auth__ShowResetCodeWithoutSmtp
+        value: "true"
+      - key: Cors__AllowedOrigins__0
+        sync: false

@@ -1,0 +1,384 @@
+=====================================================================
+ CAPR-Boost (CAPR-Net v2) - COMPLETE PROJECT EXPLANATION
+ Student: Bhavya Sharma (225/ICS/009)   Guide: Dr. Nitesh Singh Bhati
+ USICT, Gautam Buddha University, Greater Noida
+=====================================================================
+
+Yeh file viva aur presentation ki taiyari ke liye hai. Har point simple
+language me likha hai: kya use kiya, kyu use kiya, base paper se kya alag
+hai, aur results kya aaye. Saare numbers project ke apne scripts se
+measure kiye gaye hain (capr-anomaly/results/report/ folder me raw CSV hai).
+
+
+---------------------------------------------------------------------
+1. PROJECT EK LINE ME
+---------------------------------------------------------------------
+Network traffic encrypted hota hai, isliye hum packet ke andar nahi dekh
+sakte. Hum har "flow" (ek connection) ke statistics (packet size, timing,
+flags, bytes) se ML model train karte hain jo batata hai ki flow normal hai
+ya anomalous (attack / Tor / VPN). Problem: labelled data bahut kam hota hai
+(0.5% - 20%) aur kuch labels galat bhi hote hain. CAPR-Boost isi problem ko
+solve karta hai, aur ek full web application me deploy kiya gaya hai.
+
+
+---------------------------------------------------------------------
+2. TEACHER KA OBJECTION: "BASE PAPER KI ACCURACY ZYADA HAI" - JAWAB
+---------------------------------------------------------------------
+Base paper: Liu et al., "Semi-Supervised Encrypted Malicious Traffic
+Detection Based on Multimodal Traffic Characteristics", Sensors 24:6507,
+2024. Unhone CICIDS2017 dataset par F1 = 98.02% (0.5% labels) se 99.98%
+(full labels) report kiya hai.
+
+Humare purane version (CAPR-Net v1) ki accuracy kam kyu thi - 2 reasons:
+
+ (a) DATASET ALAG THA. v1 ko CIC-Darknet2020 par test kiya tha (Tor/VPN vs
+     normal traffic). Yeh CICIDS2017 se mushkil dataset hai. Alag dataset
+     ke numbers ko seedha compare karna fair nahi hai.
+
+ (b) MODEL KAMZOR THA. v1 me MLP (neural network) tha. Tabular data
+     (rows/columns wala data) par tree models (LightGBM/XGBoost) zyada
+     strong hote hain - yeh research me bhi proven hai (Grinsztajn 2022).
+
+Humne kya kiya:
+ - (b) ko fix kiya: naya model CAPR-Boost (LightGBM based). Same Darknet2020
+   split par 5% labels ke saath:
+     Accuracy: 91.33%  -->  96.94%
+     F1      : 78.63%  -->  90.99%
+ - (a) ke liye: dusra dataset add kiya - CSE-CIC-IDS2018. Yeh CICIDS2017
+   wali hi lab (Canadian Institute for Cybersecurity) aur same tool
+   (CICFlowMeter) se bana hai. CICIDS2017 humare environment me download
+   nahi ho paya, isliye yeh closest public option tha.
+     IDS2018, 0.5% labels: F1 99.08%  (base paper CICIDS2017 par 98.02%)
+     IDS2018, 5% labels  : Accuracy 99.87%, F1 99.66%
+
+Viva me kya bolna hai (IMPORTANT - honest raho):
+ "Sir/Ma'am, base paper aur humara dataset alag hai, isliye hum yeh claim
+  nahi karte ki hum base paper ko beat karte hain. Lekin same lab ke
+  sibling dataset par humara model same accuracy range me aata hai, aur
+  saath me label-noise handling, uncertainty, SHAP explanation, CPU par
+  1 minute se kam training, aur full deployed system deta hai - jo base
+  paper me nahi hai."
+
+Kabhi bhi yeh mat bolna ki humne CICIDS2017 par test kiya hai - nahi kiya.
+
+
+---------------------------------------------------------------------
+3. BASE PAPER SE KYA ALAG HAI (DIFFERENCE TABLE)
+---------------------------------------------------------------------
+ Point             | Base paper (Liu 2024)        | CAPR-Boost (hamara)
+ ------------------|------------------------------|------------------------------
+ Input             | packet sequence + flow graph | sirf flow statistics (CSV)
+ Model             | GRU + GCN + Autoencoder      | 3 LightGBM models ka ensemble
+ Galat labels      | handle nahi karta            | OOF loss + GMM se detect/fix
+ Unlabelled data   | confidence-weighted SSL      | sirf jab 3 models agree + conf>=0.97
+ Kab SSL use kare  | hamesha                      | khud decide karta hai (CV se)
+ Uncertainty       | ek confidence score          | 3 models ka std deviation
+ Explanation       | nahi                         | har flow ka TreeSHAP
+ Training          | 200 epochs, GPU              | CPU par 1 minute se kam
+ Deployment        | nahi bataya                  | full web app (Angular+.NET+SQL)
+
+
+---------------------------------------------------------------------
+4. CAPR-BOOST KAISE KAAM KARTA HAI (4 STAGES)
+---------------------------------------------------------------------
+Preprocessing: IP/port/timestamp jaise ID columns hatao, duplicate aur
+invalid rows hatao, har feature par sign(x)*log(1+|x|), phir z-score,
+phir [-10, 10] me clip.
+
+S1 - Noise-aware label refinement (galat labels pakadna)
+  - Labelled data par 5-fold cross-validation se har flow ki "out-of-fold"
+    probability nikalte hain (matlab us flow ko training me dekhe bina).
+  - Loss = -log(probability of given label). Galat label wale flow ka loss
+    zyada hota hai.
+  - Har class ke liye alag 2-component Gaussian Mixture Model (GMM) fit
+    karte hain loss par. Low-loss component = clean.
+  - Agar flow bahut suspicious hai (clean prob < 0.2) aur model dusri class
+    par confident hai (|p-0.5| > 0.3) to label FLIP karte hain (weight 0.8).
+  - Baaki flows ko unke clean prob ke hisaab se weight milta hai (min 0.05).
+  - Kyu per class? Anomaly class (minority) ka loss naturally zyada hota
+    hai; ek hi GMM sab anomalies ko noise samajh leta.
+
+S2 - Confidence-aware pseudo-labelling (unlabelled data use karna)
+  - 3 models unlabelled flows ko predict karte hain.
+  - Flow tabhi accept hota hai jab TEENO models same class bolen aur average
+    confidence >= 0.97 ho.
+  - Har class ke liye limit: 2 x (labelled count) x (class share). Isse
+    normal class poore data ko flood nahi kar paati.
+  - Accepted flows ko unke confidence ke weight ke saath training me jodte
+    hain aur model dobara train karte hain.
+
+S3 - Variant selection (kab kya use karna hai, khud decide)
+  - 4 options: plain, refine, pl (sirf pseudo-label), refine+pl.
+  - Labelled data par 3-fold CV se sabki accuracy dekhte hain, aur sabse
+    simple option choose karte hain jo best ke 0.1% ke andar ho.
+  - Test data kabhi use nahi hota.
+  - Proof (viva me pooch sakte hain): agar noise rate eta < 0.5 symmetric
+    hai, to noisy labels par accuracy = eta + (1 - 2*eta) * clean accuracy.
+    (1 - 2*eta) positive hai, isliye jo model clean data par better hai wahi
+    noisy folds par bhi better dikhega. Isliye clean validation data ki
+    zarurat nahi.
+
+S4 - Ensemble + uncertainty + explanation
+  - 3 LightGBM models (500 trees, lr 0.04, 63 leaves), alag seeds.
+  - Score = 3 ka average probability, threshold 0.5.
+  - Uncertainty = 3 ka standard deviation (zyada = model confused).
+  - TreeSHAP = har feature ne score ko kitna upar/neeche kiya (exact).
+
+
+---------------------------------------------------------------------
+5. RESULTS (SAB MEASURED, MEAN OVER SEEDS)
+---------------------------------------------------------------------
+Protocol: 30% test split fixed (seed 42), kabhi training me use nahi hota.
+Baaki 70% me se 0.5/1/5/10/20/100% labelled, baaki unlabelled.
+Darknet2020 label sweep: 5 seeds; IDS2018: 3 seeds;
+noise aur ablation: 3 seeds.
+
+CIC-Darknet2020 (5% labels):
+  CAPR-Boost      : Acc 96.94%, F1 90.99%
+  LightGBM        : Acc 96.93%, F1 90.99%
+  XGBoost         : Acc 97.05%, F1 91.34%
+  CAPR-Net v1     : Acc 91.33%, F1 78.63%
+  FixMatch        : Acc 93.08%, F1 81.94%
+  Mean Teacher    : Acc 91.53%, F1 79.17%
+
+CSE-CIC-IDS2018 subset (5% labels):
+  CAPR-Boost      : Acc 99.87%, F1 99.66%
+
+Label noise (Darknet2020, 5% labels, F1):
+  Noise   CAPR-Boost   LightGBM   CAPR-Net v1   FixMatch   Mean Teacher
+  10%     87.41        80.31      75.90         72.03      76.04
+  20%     78.70        67.14      73.13         65.45      70.80
+  30%     68.11        51.89      64.93         59.13      61.14
+  40%     41.59        36.60      53.82         48.34      48.94
+  => 10-30% noise par CAPR-Boost sabse robust hai (S1 refinement ki wajah se).
+
+Deployed models (web app me jo chal rahe hain, test split par):
+  darknet2020 (variant 'pl'): Accuracy 97.15%, Precision 92.19%, Recall 91.20%, F1 91.70%, AUC 0.9922
+  ids2018 (variant 'plain') : Accuracy 99.90%, Precision 99.87%, Recall 99.62%, F1 99.75%, AUC 1.0000
+
+HONEST NEGATIVES (yeh khud bata dena, examiner impress hote hain):
+  - Clean labels par CAPR-Boost ~ LightGBM (same). XGBoost 0.5% labels par thoda better hai,
+    LightGBM self-training 5%/10% par thoda better.
+  - Pseudo-labelling (S2) ne is dataset par accuracy nahi badhayi (ablation me dikhta hai).
+  - 40% noise par CAPR-Boost (41.59%) v1 (53.82%) se peeche hai.
+  - Full labels par IDS2018 F1 99.91% hai; base paper CICIDS2017 par 99.98% report karta hai.
+  - Base paper ka model humne re-implement nahi kiya; datasets alag hain.
+
+
+---------------------------------------------------------------------
+6. TECHNOLOGIES - KYA USE KIYA AUR KYU
+---------------------------------------------------------------------
+ML / Research
+ - Python 3.13          : ML ka standard language.
+ - LightGBM 4.7         : fast, tabular data par best, built-in TreeSHAP.
+ - scikit-learn         : GMM, cross-validation, Random Forest, metrics.
+ - XGBoost              : strong baseline.
+ - PyTorch              : sirf neural baselines (MLP, Mean Teacher,
+                          FixMatch, CAPR-Net v1) ke liye.
+ - pandas, numpy        : data handling.
+ - matplotlib           : graphs.
+
+ML Service
+ - FastAPI              : fast Python REST API, auto docs (/docs).
+ - Uvicorn              : FastAPI ka server.
+ - NFStream             : PCAP file ko flows me convert karta hai.
+ - joblib               : trained model save/load.
+
+Backend
+ - ASP.NET Core 8 Web API (C#) : fast, typed, secure API.
+ - Dapper                : SQL queries ke liye lightweight ORM (full control).
+ - SignalR               : live progress aur alerts browser tak push.
+ - PBKDF2 (Identity PasswordHasher) : password hashing.
+ - Data Protection API   : login token encrypt + 12 ghante expiry.
+
+Database
+ - SQL Server 2022       : relational DB, tables: Users, ModelVersions,
+   PcapUploads, Flows, Predictions, Alerts, ExperimentRuns,
+   PasswordResetTokens (naya), AuditEvents (naya); view
+   vw_ModelLeaderboard.
+
+Frontend
+ - Angular 18 + Angular Material : modern single-page dashboard.
+ - Chart.js              : charts (SHAP bars, metrics).
+
+Deployment
+ - Google Colab           : model training aur paper numbers ka live reproduce.
+ - Docker + Docker Compose : ek command me SQL Server + ML service + API + UI.
+
+
+---------------------------------------------------------------------
+7. IS VERSION ME KYA-KYA NAYA / UPDATE HUA
+---------------------------------------------------------------------
+ML
+ - Naya model CAPR-Boost (capr-anomaly/src/capr_boost.py).
+ - Naye baselines: Random Forest, XGBoost, LightGBM, LightGBM self-training.
+ - Dusra dataset: CSE-CIC-IDS2018 subset (tools/build_ids2018_subset.py).
+ - Full-label (100%) experiments, accuracy metric har jagah.
+ - Naye configs: configs/v2_darknet.yaml, configs/v2_ids2018.yaml.
+ - train_final.py: deployed model + metadata + feature importance.
+ - make_report.py: saari tables aur figures automatically.
+
+ML service
+ - PyTorch hata ke LightGBM ensemble; uncertainty = ensemble std.
+ - /explain ab exact TreeSHAP deta hai.
+ - CSV upload par endpoints (IP/port) aur features bhi return.
+
+Backend + Database
+ - FORGOT PASSWORD: 6-digit code, SHA-256 hash me store, 15 min expiry,
+   5 attempts, 15 min me max 3 requests, purane codes invalid,
+   same message chahe email exist kare ya na kare (user enumeration se
+   bachav). SMTP set ho to email jata hai; demo mode me screen par dikhta
+   hai (production me band karna: Auth:ShowResetCodeWithoutSmtp=false).
+ - CHANGE PASSWORD (login ke baad) + password policy (8+ chars, letter+digit).
+ - AUDIT LOG: login, failed login, reset request, reset, password change.
+ - Models me accuracy/precision/recall/ensemble size columns.
+
+Frontend
+ - Login page par "Forgot password?" link, 3-step reset page.
+ - User menu me "Change password".
+ - Dashboard par model performance cards (Acc, Precision, Recall, F1, AUC).
+ - Models aur Research pages par Accuracy column.
+
+Colab + Docker (production setup)
+ - reproduce.py: paper ke experiments same seeds/split par dobara chalata
+   hai aur paper wale number ke saath compare table deta hai.
+ - Colab notebook: Part A live training demo, Part B paper reproduce,
+   Part C deployment model export (capr_models.zip).
+ - Docker: har service ka healthcheck, backend tabhi start hota hai jab DB
+   aur ML service healthy hon, ML service aur API non-root user, sirf
+   port 4200 bahar khulta hai, log rotation, login par rate limit
+   (30/min per IP), API /health DB check karta hai, nginx security headers.
+ - Colab ka model zip ml-service/artifacts me daalo, ml-service restart,
+   "Sync from ml-service" -> nayi accuracy web app me. Image rebuild nahi.
+
+Code cleanup
+ - Faltu / purane comments hataye, sirf zaruri docstrings rakhe.
+ - Purane pilot configs aur notebooks hataye.
+
+
+---------------------------------------------------------------------
+8. PROJECT KAISE CHALAYE (DEMO)
+---------------------------------------------------------------------
+Poora flow: training Colab par, web app Docker par (HOW_TO_RUN.txt me
+detailed steps).
+
+Training (Google Colab):
+  08_Colab_Demo/CAPR_Boost_Colab_Demo.ipynb upload -> Run all ->
+  capr_colab_package.zip upload.
+  Part A: live training (~3 min), seed 0: accuracy 97.15%, F1 91.70%.
+  Part B: PRESET="headline" -> paper ke numbers (accuracy 96.94%,
+          F1 90.99%) "diff 0.00" ke saath.
+  Part C: capr_models.zip download.
+
+Web app (Docker):
+  cd capr-webapp
+  copy .env.example .env        (Linux/Mac: cp .env.example .env)
+  .env me MSSQL_SA_PASSWORD, ADMIN_PASSWORD, ML_SERVICE_API_KEY badlo
+  docker compose up -d --build
+  docker compose ps             (sab healthy)
+  Browser: http://localhost:4200  login: admin@capr.local / ADMIN_PASSWORD
+  Colab model lagana: capr_models.zip -> ml-service/artifacts/ me extract,
+  docker compose restart ml-service, Models page -> Sync from ml-service.
+
+Bina Docker: capr-webapp/README.md me step-by-step (DB, ML service,
+backend, frontend).
+
+Demo sequence (5 minute):
+  1. Login -> dashboard (model accuracy cards).
+  2. Uploads -> darknet2020 model -> sample-data/darknet2020_test_sample.csv
+  3. Upload kholo -> anomalous flow -> SHAP explanation.
+  4. Alerts -> acknowledge / resolve.
+  5. Research -> capr-anomaly/results/report/raw_results_all.csv import.
+  6. Logout -> Forgot password -> code -> new password -> login.
+
+Experiments dobara chalane ke liye:
+  cd capr-anomaly
+  pip install -r requirements.txt
+  python run_experiments.py --config configs/v2_darknet.yaml
+  python run_experiments.py --config configs/v2_ids2018.yaml
+  python make_report.py --results results/darknet2020 results/ids2018 --out results/report --artifacts artifacts
+  (CPU par kaafi ghante lagte hain; results pehle se folder me hain.)
+
+
+---------------------------------------------------------------------
+9. VIVA KE POSSIBLE QUESTIONS AUR SHORT ANSWERS
+---------------------------------------------------------------------
+Q: Aapki accuracy base paper se kam/zyada kyu hai?
+A: Dataset alag hai (section 2). Same lab ke IDS2018 par hum same range me
+   hain. Hum beat karne ka claim nahi karte.
+
+Q: Colab me 97.15% aaya, paper me 96.94% kyu likha hai?
+A: Part A ek seed (seed 0) ka result hai. Paper 5 seeds ka average deta
+   hai. Part B wahi 5 seeds chalata hai aur exactly 96.94% deta hai
+   (diff 0.00), kyunki code, seeds aur test split same hain.
+
+Q: Neural network chhod ke trees kyu?
+A: Flow features tabular hain; trees yahan consistently better hain
+   (Grinsztajn 2022, Shwartz-Ziv 2022). Humare experiment me bhi har label
+   ratio par trees > MLP/FixMatch/Mean Teacher.
+
+Q: CAPR-Boost aur plain LightGBM me kya fark hai agar clean labels par
+   dono same hain?
+A: Clean labels par S3 khud extra stages band kar deta hai, isliye same
+   result. Fark noisy labels par dikhta hai (S1), aur uncertainty +
+   explanation extra milta hai.
+
+Q: Test data leak to nahi hua?
+A: Test split pehle hi fix hai (seed 42), variant selection sirf labelled
+   training data par, noise sirf labelled training par, demo CSV sirf test
+   split se, duplicates split se pehle hataye.
+
+Q: GMM kyu?
+A: Clean aur noisy flows ka loss distribution alag hota hai (do peaks);
+   2-component GMM in dono ko alag karta hai (Arazo 2019, DivideMix).
+
+Q: Uncertainty kaise?
+A: 3 models alag seeds se; unke predictions ka std. Zyada std = review
+   karo. Alert severity bhi isse adjust hoti hai.
+
+Q: Forgot password secure kaise hai?
+A: Code random (RandomNumberGenerator), DB me sirf hash, 15 min expiry,
+   5 attempts, rate limit, generic response, audit log.
+
+Q: 40% noise par kya hota hai?
+A: Wahan S1 noisy aur hard examples me fark nahi kar pata; yeh limitation
+   hai, report me likha hai.
+
+
+---------------------------------------------------------------------
+10. FOLDER STRUCTURE (DELIVERABLE)
+---------------------------------------------------------------------
+  01_Source_Code/capr-anomaly    research code, data, results, models
+  01_Source_Code/capr-webapp     web application
+  02_Research_Paper/             IEEE LaTeX source + PDF
+  03_Project_Report/             Word + PDF
+  04_Presentation/               PPTX + PDF (college template)
+  05_Screenshots/                13 application screenshots
+  06_Results/                    tables, figures, raw CSV
+  07_Reference_Papers/           base paper and references
+  08_Colab_Demo/                 Colab notebook + capr_colab_package.zip
+  PROJECT_EXPLANATION.txt        yeh file
+  HOW_TO_RUN.txt                 short run guide
+
+
+---------------------------------------------------------------------
+11. PAPER SUBMISSION, PLAGIARISM AUR AI-USE - ZAROORI NOTE
+---------------------------------------------------------------------
+ - Paper aur report original wording me likhe gaye hain, har idea ka
+   proper citation hai, aur har number humare code se measured hai. Base
+   paper ke numbers clearly "reported" likhe hain.
+ - Submit karne se pehle report/paper ko university ke plagiarism tool
+   (Turnitin/DrillBit) se check karo aur similarity page report me lagao.
+ - AI DISCLOSURE: is project me AI assistant ki madad li gayi hai. Isko
+   chhupane ki koshish mat karna. IEEE ki policy ke hisaab se AI-generated
+   text ka use paper ke Acknowledgment section me disclose karna hota hai,
+   aur university ki policy bhi follow karo (report me "Declaration of
+   AI-Assisted Tool Usage" page diya hai). Hum "AI detector se bachne" ke
+   liye kuch nahi karte - sahi tarika disclosure hai.
+ - Paper aur report ko khud dhyan se padho, samjho aur apne shabdon me
+   jahan zarurat ho badlo. Viva me har stage (S1-S4) aur har number aapko
+   khud explain karna aana chahiye.
+ - Paper me author affiliation aur guide ka naam check karo; IEEE
+   conference choose karke uske template/page limit ke hisaab se adjust
+   karo. Guide se permission lekar hi submit karo.
+ - Report me HOD naam, signatures aur dates abhi blank hain - bhar dena.
