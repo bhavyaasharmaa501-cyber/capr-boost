@@ -1,0 +1,62 @@
+output_dir: results/synthetic_smoke
+device: auto
+seeds:
+- 0
+test_size: 0.3
+datasets:
+- name: synthetic
+  type: synthetic
+  n_samples: 20000
+  anomaly_ratio: 0.2
+experiments:
+  smoke:
+    label_ratios:
+    - 0.05
+    noise_rates:
+    - 0.0
+    - 0.2
+    methods:
+    - lgbm
+    - capr
+    - capr_boost
+model:
+  hidden:
+  - 256
+  - 128
+  - 64
+  dropout: 0.2
+  lr: 0.001
+  batch_size: 512
+  epochs_warmup: 20
+  epochs_per_round: 8
+  min_steps: 300
+  ae_hidden:
+  - 128
+  - 64
+  ae_latent: 16
+  ae_epochs: 30
+ssl_epochs: 10
+capr:
+  rounds: 5
+  mc_passes: 10
+  alpha: 0.6
+  tau_base: 0.95
+  tau_min: 0.7
+  lambda_unc: 1.0
+  gmm_clean_threshold: 0.5
+  use_ae: true
+  use_uncertainty: true
+  adaptive_threshold: true
+  gmm_refine: true
+  refresh_pseudo: true
+  balance_pseudo: true
+  oof_folds: 5
+  label_correction: false
+  score_mode: classifier
+  weight_labeled_noise: true
+  min_label_weight: 0.1
+  confident_gate: false
+  agree_floor: 0.85
+  ae_reliability: false
+  ae_min_auc: 0.55
+boost: {}

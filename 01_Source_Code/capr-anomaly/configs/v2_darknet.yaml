@@ -1,0 +1,126 @@
+device: auto
+test_size: 0.3
+model:
+  hidden:
+  - 256
+  - 128
+  - 64
+  dropout: 0.2
+  lr: 0.001
+  batch_size: 512
+  epochs_warmup: 20
+  epochs_per_round: 8
+  min_steps: 300
+  ae_hidden:
+  - 128
+  - 64
+  ae_latent: 16
+  ae_epochs: 30
+ssl_epochs: 10
+capr:
+  rounds: 5
+  mc_passes: 10
+  alpha: 0.6
+  tau_base: 0.95
+  tau_min: 0.7
+  lambda_unc: 1.0
+  gmm_clean_threshold: 0.5
+  use_ae: true
+  use_uncertainty: true
+  adaptive_threshold: true
+  gmm_refine: true
+  refresh_pseudo: true
+  balance_pseudo: true
+  oof_folds: 5
+  label_correction: false
+  score_mode: classifier
+  weight_labeled_noise: true
+  min_label_weight: 0.1
+  confident_gate: false
+  agree_floor: 0.85
+  ae_reliability: false
+  ae_min_auc: 0.55
+boost: {}
+output_dir: results/darknet2020
+seeds:
+- 0
+- 1
+- 2
+- 3
+- 4
+datasets:
+- name: darknet2020
+  type: csv
+  path: data/Darknet2020/Darknet.CSV
+  label_col: Label
+  normal_values:
+  - Non-Tor
+  - NonVPN
+  drop_cols:
+  - Label.1
+experiments:
+  label_sweep:
+    label_ratios:
+    - 0.005
+    - 0.01
+    - 0.05
+    - 0.1
+    - 0.2
+    noise_rates:
+    - 0.0
+    methods:
+    - iforest
+    - supervised
+    - mean_teacher
+    - fixmatch
+    - capr
+    - rf
+    - xgb
+    - lgbm
+    - lgbm_selftrain
+    - capr_boost
+  full_label:
+    label_ratios:
+    - 1.0
+    noise_rates:
+    - 0.0
+    methods:
+    - rf
+    - xgb
+    - lgbm
+    - capr_boost
+  noise_sweep:
+    label_ratios:
+    - 0.05
+    noise_rates:
+    - 0.0
+    - 0.1
+    - 0.2
+    - 0.3
+    - 0.4
+    methods:
+    - mean_teacher
+    - fixmatch
+    - capr
+    - lgbm
+    - capr_boost
+    seeds:
+    - 0
+    - 1
+    - 2
+  ablation:
+    label_ratios:
+    - 0.05
+    noise_rates:
+    - 0.0
+    - 0.2
+    methods:
+    - capr_boost
+    - capr_boost_no_refine
+    - capr_boost_no_pseudo
+    - capr_boost_no_select
+    - capr_boost_single
+    seeds:
+    - 0
+    - 1
+    - 2
