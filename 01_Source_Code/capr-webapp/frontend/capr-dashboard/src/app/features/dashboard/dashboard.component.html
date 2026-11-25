@@ -1,0 +1,129 @@
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <p>Live overview across every upload, prediction and alert.</p>
+</div>
+
+@if (loading()) {
+  <div class="loading">
+    <mat-spinner diameter="36" />
+  </div>
+} @else {
+  @if (summary(); as s) {
+    <div class="stat-grid">
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon">upload_file</mat-icon>
+        <div>
+          <div class="stat-value">{{ s.totalUploads }}</div>
+          <div class="stat-label">Uploads processed</div>
+        </div>
+      </mat-card>
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon">device_hub</mat-icon>
+        <div>
+          <div class="stat-value">{{ s.totalFlows | number }}</div>
+          <div class="stat-label">Flows scored</div>
+        </div>
+      </mat-card>
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon warn">report</mat-icon>
+        <div>
+          <div class="stat-value">{{ s.totalAnomalies | number }}</div>
+          <div class="stat-label">Anomalies detected</div>
+        </div>
+      </mat-card>
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon danger">notifications_active</mat-icon>
+        <div>
+          <div class="stat-value">{{ s.openAlerts }}</div>
+          <div class="stat-label">Open alerts</div>
+        </div>
+      </mat-card>
+      <mat-card class="stat-card">
+        <mat-icon class="stat-icon">model_training</mat-icon>
+        <div>
+          <div class="stat-value">{{ s.activeModelCount }}</div>
+          <div class="stat-label">Active models</div>
+        </div>
+      </mat-card>
+    </div>
+
+    @if (models().length > 0) {
+      <div class="model-grid">
+        @for (m of models(); track m.modelVersionId) {
+          <mat-card class="model-card">
+            <div class="model-head">
+              <mat-icon>verified</mat-icon>
+              <div>
+                <div class="model-name">{{ m.methodName }} &middot; {{ m.datasetName }}</div>
+                <div class="model-sub">{{ m.labelRatio * 100 | number: '1.0-1' }}% labelled data &middot; {{ m.ensembleSize }}-model ensemble &middot; {{ m.nFeatures }} features</div>
+              </div>
+            </div>
+            <div class="metric-row">
+              <div class="metric"><span class="mv">{{ pct(m.testAccuracy) }}</span><span class="ml">Accuracy</span></div>
+              <div class="metric"><span class="mv">{{ pct(m.testPrecision) }}</span><span class="ml">Precision</span></div>
+              <div class="metric"><span class="mv">{{ pct(m.testRecall) }}</span><span class="ml">Recall</span></div>
+              <div class="metric"><span class="mv">{{ pct(m.testF1) }}</span><span class="ml">F1-score</span></div>
+              <div class="metric"><span class="mv">{{ m.testAucRoc !== null ? (m.testAucRoc | number: '1.4-4') : '—' }}</span><span class="ml">AUC-ROC</span></div>
+            </div>
+          </mat-card>
+        }
+      </div>
+    }
+
+    <div class="severity-row">
+      @for (sev of severityOrder; track sev) {
+        <div class="severity-item">
+          <app-severity-badge [severity]="sev" />
+          <span class="severity-count">{{ severityCount(s, sev) }}</span>
+        </div>
+      }
+    </div>
+
+    <div class="columns">
+      <mat-card class="panel">
+        <div class="panel-header">
+          <h2>Recent open alerts</h2>
+          <a mat-button routerLink="/alerts">View all</a>
+        </div>
+        @if (s.recentAlerts.length === 0) {
+          <p class="empty">No open alerts. All clear.</p>
+        } @else {
+          <mat-nav-list>
+            @for (a of s.recentAlerts; track a.alertId) {
+              <a mat-list-item routerLink="/alerts">
+                <app-severity-badge matListItemIcon [severity]="a.severity" />
+                <span matListItemTitle>{{ a.title }}</span>
+                <span matListItemLine>{{ a.srcIp || 'unknown' }} &rarr; {{ a.dstIp || 'unknown' }} &middot; {{ a.createdAtUtc | date: 'short' }}</span>
+              </a>
+            }
+          </mat-nav-list>
+        }
+      </mat-card>
+
+      <mat-card class="panel">
+        <div class="panel-header">
+          <h2>Recent uploads</h2>
+          <a mat-button routerLink="/uploads">View all</a>
+        </div>
+        @if (s.recentUploads.length === 0) {
+          <p class="empty">No uploads yet.</p>
+        } @else {
+          <mat-nav-list>
+            @for (u of s.recentUploads; track u.pcapUploadId) {
+              <a mat-list-item routerLink="/uploads">
+                <mat-icon matListItemIcon>insert_drive_file</mat-icon>
+                <span matListItemTitle>{{ u.originalFileName }}</span>
+                <span matListItemLine>
+                  <app-status-badge [status]="u.status" />
+                  @if (u.flowCount !== null) {
+                    &middot; {{ u.flowCount }} flows, {{ u.anomalyCount }} anomalies
+                  }
+                </span>
+              </a>
+            }
+          </mat-nav-list>
+        }
+      </mat-card>
+    </div>
+  }
+}

@@ -1,0 +1,127 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle at 20% 20%, #1f3a93 0%, #111a3d 45%, #0b5d4f 100%);
+  padding: 16px;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  padding: 32px;
+  border-radius: 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+
+  .brand-icon {
+    font-size: 40px;
+    width: 40px;
+    height: 40px;
+    color: #1a237e;
+  }
+
+  h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+
+  p {
+    margin: 2px 0 0;
+    font-size: 12px;
+    color: rgba(0, 0, 0, 0.6);
+  }
+}
+
+.full-width {
+  width: 100%;
+}
+
+.submit {
+  height: 44px;
+  margin-top: 8px;
+}
+
+.error {
+  color: #c62828;
+  font-size: 13px;
+  margin: -8px 0 12px;
+}
+
+.hint {
+  margin: 20px 0 0;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.row-links {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 10px;
+  font-size: 13px;
+
+  a {
+    color: #1f3a93;
+    text-decoration: none;
+    font-weight: 500;
+  }
+}
+
+.lead {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+  margin: 0 0 16px;
+}
+
+.info {
+  font-size: 13px;
+  background: #e8f5e9;
+  color: #1b5e20;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 12px;
+}
+
+.demo-code {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 13px;
+  background: #fff8e1;
+  color: #6d4c00;
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 16px;
+
+  strong {
+    font-size: 16px;
+    letter-spacing: 2px;
+  }
+}
+
+.confirm {
+  margin-top: 12px;
+}
+
+.done {
+  text-align: center;
+
+  .done-icon {
+    font-size: 56px;
+    width: 56px;
+    height: 56px;
+    color: #2e7d32;
+  }
+}
+
+.hint a {
+  color: #1f3a93;
+  text-decoration: none;
+}

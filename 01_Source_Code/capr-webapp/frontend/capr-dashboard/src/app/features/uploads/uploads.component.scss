@@ -1,0 +1,46 @@
+.upload-form {
+  padding: 20px;
+  margin-bottom: 20px;
+
+  form {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  mat-form-field {
+    min-width: 320px;
+  }
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.file-name {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+mat-progress-bar {
+  flex-basis: 100%;
+}
+
+.table-card {
+  padding: 8px;
+
+  table {
+    width: 100%;
+  }
+}
+
+.clickable-row {
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.03);
+  }
+}

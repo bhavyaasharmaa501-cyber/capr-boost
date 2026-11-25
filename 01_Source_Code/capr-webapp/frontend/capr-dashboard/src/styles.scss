@@ -1,0 +1,54 @@
+
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  background: #f4f5f9;
+}
+
+.page-header {
+  margin-bottom: 20px;
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 24px;
+    font-weight: 600;
+  }
+  p {
+    margin: 0;
+    color: rgba(0, 0, 0, 0.6);
+    font-size: 14px;
+  }
+}
+
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 60px 0;
+}
+
+.empty {
+  color: rgba(0, 0, 0, 0.5);
+  font-size: 14px;
+  padding: 8px 0;
+}
+
+.spacer-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.mat-toolbar.mat-primary {
+  background: #1b2559;
+  color: #fff;
+}
+
+.mat-mdc-card {
+  border-radius: 12px !important;
+}

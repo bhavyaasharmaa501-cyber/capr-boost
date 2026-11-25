@@ -1,0 +1,92 @@
+<div class="page-header">
+  <div class="spacer-row">
+    <div>
+      <h1>Models</h1>
+      <p>Every model version registered from the ml-service, with the metrics it was trained and tested with.</p>
+    </div>
+    @if (isAdmin()) {
+      <button mat-flat-button color="primary" [disabled]="syncing()" (click)="sync()">
+        @if (syncing()) {
+          <mat-spinner diameter="18" />
+        } @else {
+          <ng-container><mat-icon>sync</mat-icon> Sync from ml-service</ng-container>
+        }
+      </button>
+    }
+  </div>
+</div>
+
+<mat-card class="table-card">
+  @if (loading()) {
+    <div class="loading">
+      <mat-spinner diameter="32" />
+    </div>
+  } @else if (models().length === 0) {
+    <p class="empty">
+      No models registered yet.
+      @if (isAdmin()) {
+        Use "Sync from ml-service" above once a model has been trained.
+      }
+    </p>
+  } @else {
+    <table mat-table [dataSource]="models()">
+      <ng-container matColumnDef="dataset">
+        <th mat-header-cell *matHeaderCellDef>Dataset</th>
+        <td mat-cell *matCellDef="let m">{{ m.datasetName }}</td>
+      </ng-container>
+      <ng-container matColumnDef="method">
+        <th mat-header-cell *matHeaderCellDef>Method</th>
+        <td mat-cell *matCellDef="let m">{{ m.methodName }}</td>
+      </ng-container>
+      <ng-container matColumnDef="labelRatio">
+        <th mat-header-cell *matHeaderCellDef>Label ratio</th>
+        <td mat-cell *matCellDef="let m">{{ m.labelRatio | number: '1.2-2' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="nFeatures">
+        <th mat-header-cell *matHeaderCellDef>Features</th>
+        <td mat-cell *matCellDef="let m">{{ m.nFeatures }}</td>
+      </ng-container>
+      <ng-container matColumnDef="accuracy">
+        <th mat-header-cell *matHeaderCellDef>Accuracy</th>
+        <td mat-cell *matCellDef="let m">{{ m.testAccuracy !== null ? (m.testAccuracy * 100 | number: '1.2-2') + '%' : '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="f1">
+        <th mat-header-cell *matHeaderCellDef>F1</th>
+        <td mat-cell *matCellDef="let m">{{ m.testF1 !== null ? (m.testF1 | number: '1.3-3') : '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="aucPr">
+        <th mat-header-cell *matHeaderCellDef>AUC-PR</th>
+        <td mat-cell *matCellDef="let m">{{ m.testAucPr !== null ? (m.testAucPr | number: '1.3-3') : '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="aucRoc">
+        <th mat-header-cell *matHeaderCellDef>AUC-ROC</th>
+        <td mat-cell *matCellDef="let m">{{ m.testAucRoc !== null ? (m.testAucRoc | number: '1.3-3') : '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="fpr">
+        <th mat-header-cell *matHeaderCellDef>FPR</th>
+        <td mat-cell *matCellDef="let m">{{ m.testFpr !== null ? (m.testFpr | number: '1.3-3') : '—' }}</td>
+      </ng-container>
+      <ng-container matColumnDef="ensembleSize">
+        <th mat-header-cell *matHeaderCellDef matTooltip="Number of boosted models in the ensemble">Ensemble</th>
+        <td mat-cell *matCellDef="let m">{{ m.ensembleSize }}</td>
+      </ng-container>
+      <ng-container matColumnDef="status">
+        <th mat-header-cell *matHeaderCellDef>Status</th>
+        <td mat-cell *matCellDef="let m">
+          @if (m.isActive) {
+            <span class="active-text">Active</span>
+          } @else {
+            <span class="hint">Retired</span>
+          }
+        </td>
+      </ng-container>
+      <ng-container matColumnDef="registeredAt">
+        <th mat-header-cell *matHeaderCellDef>Registered</th>
+        <td mat-cell *matCellDef="let m">{{ m.registeredAtUtc | date: 'short' }}</td>
+      </ng-container>
+
+      <tr mat-header-row *matHeaderRowDef="columns"></tr>
+      <tr mat-row *matRowDef="let row; columns: columns"></tr>
+    </table>
+  }
+</mat-card>

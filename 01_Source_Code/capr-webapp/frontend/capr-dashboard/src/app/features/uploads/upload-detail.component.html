@@ -1,0 +1,123 @@
+<div class="page-header">
+  <a mat-button routerLink="/uploads"><mat-icon>arrow_back</mat-icon> Back to uploads</a>
+  @if (upload(); as u) {
+    <h1>{{ u.originalFileName }}</h1>
+    <p>
+      <app-status-badge [status]="u.status" />
+      @if (u.flowCount !== null) {
+        &middot; {{ u.flowCount }} flows &middot; {{ u.anomalyCount }} anomalies
+      }
+      @if (u.errorMessage) {
+        &middot; <span class="err">{{ u.errorMessage }}</span>
+      }
+    </p>
+  }
+</div>
+
+<div class="detail-layout">
+  <mat-card class="table-panel">
+    <div class="spacer-row toolbar-row">
+      <mat-button-toggle-group [value]="anomaliesOnly()" (change)="setAnomaliesOnly($event.value)">
+        <mat-button-toggle [value]="true">Anomalies only</mat-button-toggle>
+        <mat-button-toggle [value]="false">All flows</mat-button-toggle>
+      </mat-button-toggle-group>
+    </div>
+
+    @if (loading()) {
+      <div class="loading">
+        <mat-spinner diameter="32" />
+      </div>
+    } @else if (predictions().length === 0) {
+      <p class="empty">No flows match this filter.</p>
+    } @else {
+      <table mat-table [dataSource]="predictions()">
+        <ng-container matColumnDef="endpoint">
+          <th mat-header-cell *matHeaderCellDef>Flow</th>
+          <td mat-cell *matCellDef="let p">
+            {{ p.srcIp || 'unknown' }}:{{ p.srcPort ?? '?' }} &rarr; {{ p.dstIp || 'unknown' }}:{{ p.dstPort ?? '?' }}
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="probability">
+          <th mat-header-cell *matHeaderCellDef>P(anomaly)</th>
+          <td mat-cell *matCellDef="let p">{{ p.anomalyProbability | number: '1.3-3' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="uncertainty">
+          <th mat-header-cell *matHeaderCellDef>Uncertainty</th>
+          <td mat-cell *matCellDef="let p">{{ p.uncertainty !== null ? (p.uncertainty | number: '1.3-3') : '—' }}</td>
+        </ng-container>
+        <ng-container matColumnDef="isAnomaly">
+          <th mat-header-cell *matHeaderCellDef>Verdict</th>
+          <td mat-cell *matCellDef="let p">
+            <mat-icon [class.anomaly-icon]="p.isAnomaly" [class.normal-icon]="!p.isAnomaly">
+              {{ p.isAnomaly ? 'report' : 'check_circle' }}
+            </mat-icon>
+          </td>
+        </ng-container>
+        <ng-container matColumnDef="scoredAt">
+          <th mat-header-cell *matHeaderCellDef>Scored</th>
+          <td mat-cell *matCellDef="let p">{{ p.scoredAtUtc | date: 'short' }}</td>
+        </ng-container>
+
+        <tr mat-header-row *matHeaderRowDef="columns"></tr>
+        <tr
+          mat-row
+          *matRowDef="let row; columns: columns"
+          class="clickable-row"
+          [class.selected-row]="selected()?.predictionId === row.predictionId"
+          (click)="select(row)"
+        ></tr>
+      </table>
+
+      <mat-paginator
+        [length]="totalCount()"
+        [pageSize]="pageSize()"
+        [pageIndex]="page()"
+        [pageSizeOptions]="[25, 50, 100]"
+        (page)="onPage($event)"
+      />
+    }
+  </mat-card>
+
+  <mat-card class="detail-panel">
+    @if (selected(); as p) {
+      <h2>Flow detail</h2>
+      <dl>
+        <dt>Endpoint</dt>
+        <dd>{{ p.srcIp || 'unknown' }}:{{ p.srcPort ?? '?' }} &rarr; {{ p.dstIp || 'unknown' }}:{{ p.dstPort ?? '?' }}</dd>
+        <dt>Anomaly probability</dt>
+        <dd>{{ p.anomalyProbability | number: '1.4-4' }} (threshold {{ p.threshold }})</dd>
+        <dt>Uncertainty (ensemble std)</dt>
+        <dd>{{ p.uncertainty !== null ? (p.uncertainty | number: '1.4-4') : 'not requested' }}</dd>
+        <dt>Scored at</dt>
+        <dd>{{ p.scoredAtUtc | date: 'medium' }} @if (p.inferenceMs) { ({{ p.inferenceMs | number: '1.1-1' }} ms) }</dd>
+      </dl>
+
+      @if (p.topFeatures && p.topFeatures.length > 0) {
+        <h3>Why: top SHAP contributions</h3>
+        <p class="hint">Red pushes toward anomaly, blue pushes toward normal.</p>
+        <div class="shap-bars">
+          @for (f of p.topFeatures; track f.feature) {
+            <div class="shap-row">
+              <span class="feature-name" [matTooltip]="'value = ' + f.value">{{ f.feature }}</span>
+              <div class="bar-track">
+                <div
+                  class="bar-fill"
+                  [class.positive]="f.shap >= 0"
+                  [style.width.%]="barWidth(f.shap, p.topFeatures)"
+                ></div>
+              </div>
+              <span class="shap-value">{{ f.shap | number: '1.3-3' }}</span>
+            </div>
+          }
+        </div>
+      } @else if (p.isAnomaly) {
+        <p class="hint">No SHAP explanation stored for this flow (explanations are computed for anomalous flows, up to the per-upload limit).</p>
+      }
+    } @else {
+      <div class="placeholder">
+        <mat-icon>touch_app</mat-icon>
+        <p>Select a flow to see its score and (for anomalies) SHAP explanation.</p>
+      </div>
+    }
+  </mat-card>
+</div>
